@@ -556,7 +556,7 @@ func parseLiteral(val, datatype string) (interface{}, error) {
 	switch datatype {
 	case xsdString.str:
 		return val, nil
-	case xsdInteger.str:
+	case xsdInteger.str, xsdInt.str:
 		i, err := strconv.Atoi(val)
 		if err != nil {
 			return nil, err

@@ -363,7 +363,7 @@ func (e *TripleEncoder) outputNewPrefixesTerm(t Term) {
 
 	case TermLiteral:
 		switch t.(Literal).DataType {
-		case xsdString, xsdInteger, xsdBoolean, xsdDouble, xsdDecimal, rdfLangString:
+		case xsdString, xsdInteger, xsdInt, xsdBoolean, xsdDouble, xsdDecimal, rdfLangString:
 			return
 		default:
 			if f, _ := t.(Literal).DataType.Split(); f != "" {
