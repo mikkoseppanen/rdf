@@ -13,7 +13,7 @@ type ttlDecoder struct {
 
 	state     parseFn           // state of parser
 	base      IRI               // base (default IRI)
-	bnodeN    int               // anonymous blank node counter
+	bnode     BNodeGenerator    // Generator for blank nodes
 	ns        map[string]string // map[prefix]namespace
 	tokens    [3]token          // 3 token lookahead
 	peekCount int               // number of tokens peeked at (position in tokens lookahead array)
@@ -34,18 +34,27 @@ func newTTLDecoder(r io.Reader) *ttlDecoder {
 		ns:       make(map[string]string),
 		ctxStack: make([]ctxTriple, 0, 8),
 		triples:  make([]Triple, 0, 4),
+		bnode:    NewBNodeGenerator(nil),
 	}
 }
 
 // SetOption sets a ParseOption to the give value
 func (d *ttlDecoder) SetOption(o ParseOption, v interface{}) error {
 	switch o {
-	case Base:
+	case OptBase:
 		iri, ok := v.(IRI)
 		if !ok {
 			return fmt.Errorf("ParseOption \"Base\" must be an IRI.")
 		}
 		d.base = iri
+
+	case OptBNodeGenerator:
+		gen, ok := v.(BNodeGenerator)
+		if !ok {
+			return fmt.Errorf(`ParseOption "BNodeGenerator" must be an BNodeGenerator.`)
+		}
+		d.bnode = gen
+
 	default:
 		return fmt.Errorf("RDF/XML decoder doesn't support option: %v", o)
 	}
@@ -204,9 +213,8 @@ func parseEnd(d *ttlDecoder) parseFn {
 		if d.current.Ctx == ctxColl {
 			d.backup() // unread collection item, to be parsed on next iteration
 
-			d.bnodeN++
 			d.current.Pred = IRI{str: "http://www.w3.org/1999/02/22-rdf-syntax-ns#rest"}
-			d.current.Obj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
+			d.current.Obj = d.bnode.Gen()
 			d.emit()
 
 			d.current.Subj = d.current.Obj.(Subject)
@@ -241,8 +249,7 @@ func parseSubject(d *ttlDecoder) parseFn {
 	case tokenBNode:
 		d.current.Subj = Blank{id: tok.text}
 	case tokenAnonBNode:
-		d.bnodeN++
-		d.current.Subj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
+		d.current.Subj = d.bnode.Gen()
 	case tokenPrefixLabel:
 		ns, ok := d.ns[tok.text]
 		if !ok {
@@ -252,8 +259,7 @@ func parseSubject(d *ttlDecoder) parseFn {
 		d.current.Subj = IRI{str: ns + suf.text}
 	case tokenPropertyListStart:
 		// Blank node is subject of a new triple
-		d.bnodeN++
-		d.current.Subj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
+		d.current.Subj = d.bnode.Gen()
 		d.pushContext() // Subj = bnode, top context
 		d.current.Ctx = ctxList
 	case tokenCollectionStart:
@@ -262,8 +268,8 @@ func parseSubject(d *ttlDecoder) parseFn {
 			d.current.Subj = IRI{str: "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil"}
 			break
 		}
-		d.bnodeN++
-		d.current.Subj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
+
+		d.current.Subj = d.bnode.Gen()
 		d.pushContext()
 		d.current.Pred = IRI{str: "http://www.w3.org/1999/02/22-rdf-syntax-ns#first"}
 		d.current.Ctx = ctxColl
@@ -315,8 +321,7 @@ func parseObject(d *ttlDecoder) parseFn {
 	case tokenBNode:
 		d.current.Obj = Blank{id: tok.text}
 	case tokenAnonBNode:
-		d.bnodeN++
-		d.current.Obj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
+		d.current.Obj = d.bnode.Gen()
 	case tokenLiteral, tokenLiteral3:
 		val := tok.text
 		l := Literal{
@@ -378,8 +383,7 @@ func parseObject(d *ttlDecoder) parseFn {
 		// Save current context, to be restored after the list ends
 		d.pushContext()
 
-		d.bnodeN++
-		d.current.Obj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
+		d.current.Obj = d.bnode.Gen()
 		d.emit()
 
 		// Set blank node as subject of the next triple. Push to stack and return.
@@ -400,8 +404,7 @@ func parseObject(d *ttlDecoder) parseFn {
 		// Save current context, to be restored after the collection ends
 		d.pushContext()
 
-		d.bnodeN++
-		d.current.Obj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
+		d.current.Obj = d.bnode.Gen()
 		d.emit()
 		d.current.Subj = d.current.Obj.(Subject)
 		d.current.Pred = IRI{str: "http://www.w3.org/1999/02/22-rdf-syntax-ns#first"}

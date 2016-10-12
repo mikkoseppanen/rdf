@@ -49,36 +49,48 @@ type rdfXMLDecoder struct {
 	dec *xml.Decoder
 
 	// xml parser state
-	state     parseXMLFn // current state function
-	nextState parseXMLFn // which state function enter on the next call to Decode()
-	ns        []string   // prefix and namespaces (only from the top-level element, usually rdf:RDF)
-	base      string     // top level xml:base
-	bnodeN    int        // anonymous blank node counter
-	tok       xml.Token  // current XML token
-	topElem   string     // top level element (namespace+localname)
-	reifyID   string     // if not "", id to be resolved against the current in-scope Base IRI
-	dt        *IRI       // datatype of the Literal to be parsed
-	lang      string     // xml element in-scope xml:lang
-	current   Triple     // the current triple beeing parsed
-	ctx       evalCtx    // current node evaluation context
-	ctxStack  []evalCtx  // stack of parent evaluation contexts
+	state     parseXMLFn     // current state function
+	nextState parseXMLFn     // which state function enter on the next call to Decode()
+	ns        []string       // prefix and namespaces (only from the top-level element, usually rdf:RDF)
+	base      string         // top level xml:base
+	bnode     BNodeGenerator // Generator for blank nodes
+	tok       xml.Token      // current XML token
+	topElem   string         // top level element (namespace+localname)
+	reifyID   string         // if not "", id to be resolved against the current in-scope Base IRI
+	dt        *IRI           // datatype of the Literal to be parsed
+	lang      string         // xml element in-scope xml:lang
+	current   Triple         // the current triple beeing parsed
+	ctx       evalCtx        // current node evaluation context
+	ctxStack  []evalCtx      // stack of parent evaluation contexts
 
 	triples []Triple // complete, valid triples to be emitted
 }
 
 func newRDFXMLDecoder(r io.Reader) *rdfXMLDecoder {
-	return &rdfXMLDecoder{dec: xml.NewDecoder(r), nextState: parseXMLTopElem}
+	return &rdfXMLDecoder{
+		dec:       xml.NewDecoder(r),
+		nextState: parseXMLTopElem,
+		bnode:     NewBNodeGenerator(nil),
+	}
 }
 
 // SetOption sets a ParseOption to the give value
 func (d *rdfXMLDecoder) SetOption(o ParseOption, v interface{}) error {
 	switch o {
-	case Base:
+	case OptBase:
 		iri, ok := v.(IRI)
 		if !ok {
 			return fmt.Errorf("ParseOption \"Base\" must be an IRI.")
 		}
 		d.ctx.Base = iri.str
+
+	case OptBNodeGenerator:
+		gen, ok := v.(BNodeGenerator)
+		if !ok {
+			return fmt.Errorf(`ParseOption "BNodeGenerator" must be an BNodeGenerator.`)
+		}
+		d.bnode = gen
+
 	default:
 		return fmt.Errorf("RDF/XML decoder doesn't support option: %v", o)
 	}
@@ -216,8 +228,7 @@ func parseXMLNodeElem(d *rdfXMLDecoder) parseXMLFn {
 				if len(elem.Attr) == 0 || d.current.Subj == nil {
 					// A rdf:Description with no ID or about attribute describes an
 					// un-named resource, aka a bNode.
-					d.current.Subj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
-					d.bnodeN++
+					d.current.Subj = d.bnode.Gen()
 				}
 
 				if as := attrRest(elem); as != nil {
@@ -271,8 +282,7 @@ func parseXMLNodeElem(d *rdfXMLDecoder) parseXMLFn {
 
 		if d.current.Subj == nil {
 			// A typed element without with no attributes
-			d.current.Subj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
-			d.bnodeN++
+			d.current.Subj = d.bnode.Gen()
 		}
 
 		d.current.Pred = rdfType
@@ -378,8 +388,7 @@ first:
 				// A new element
 				if len(elem.Attr) == 0 {
 					// Element is a blank node
-					d.current.Obj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
-					d.bnodeN++
+					d.current.Obj = d.bnode.Gen()
 					d.triples = append(d.triples, d.current)
 
 					d.current.Subj = d.current.Obj.(Subject)
@@ -431,8 +440,7 @@ second:
 
 				if as := attrRest(elem); as != nil {
 					// Element is an anonymous blank node
-					d.current.Obj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
-					d.bnodeN++
+					d.current.Obj = d.bnode.Gen()
 					d.triples = append(d.triples, d.current)
 					d.reifyCheck()
 
@@ -460,8 +468,7 @@ second:
 				}
 
 				// Default case, Element is a blank node
-				d.current.Obj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
-				d.bnodeN++
+				d.current.Obj = d.bnode.Gen()
 				d.triples = append(d.triples, d.current)
 				d.reifyCheck()
 
@@ -550,8 +557,7 @@ func parseXMLPropElem(d *rdfXMLDecoder) parseXMLFn {
 			case "Resource":
 				// Omitting rdf:Decsription for blank node
 				// http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-parsetype-resource
-				d.current.Obj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
-				d.bnodeN++
+				d.current.Obj = d.bnode.Gen()
 
 				d.triples = append(d.triples, d.current)
 				d.reifyCheck()
@@ -643,8 +649,7 @@ func parseXMLPropElem(d *rdfXMLDecoder) parseXMLFn {
 			// these can be abbreviated by moving them to be property attributes
 			// on the containing property element which is made an empty element.
 			// http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-property-attributes-on-property-element
-			d.current.Obj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
-			d.bnodeN++
+			d.current.Obj = d.bnode.Gen()
 			d.triples = append(d.triples, d.current)
 			d.pushContext()
 
@@ -679,8 +684,7 @@ func parseXMLPropElem(d *rdfXMLDecoder) parseXMLFn {
 // element with attribute parseType="Collection".
 // Subject an Predicate is set.
 func parseXMLColl(d *rdfXMLDecoder) parseXMLFn {
-	d.current.Obj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
-	d.bnodeN++
+	d.current.Obj = d.bnode.Gen()
 
 	d.triples = append(d.triples, d.current)
 
@@ -702,8 +706,7 @@ outer:
 						first = false
 					} else {
 						d.current.Pred = rdfRest
-						d.current.Obj = Blank{id: fmt.Sprintf("_:b%d", d.bnodeN)}
-						d.bnodeN++
+						d.current.Obj = d.bnode.Gen()
 						d.triples = append(d.triples, d.current)
 
 						d.current.Subj = d.current.Obj.(Subject)

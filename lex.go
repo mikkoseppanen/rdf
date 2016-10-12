@@ -291,8 +291,8 @@ func (l *lexer) acceptCaseInsensitive(s string) bool {
 
 // nextToken returns the next token from the input.
 func (l *lexer) nextToken() token {
-	token := <-l.tokens
-	return token
+	t := <-l.tokens
+	return t
 }
 
 func (l *lexer) feed(overwrite bool) bool {
@@ -476,7 +476,7 @@ func lexAny(l *lexer) stateFn {
 		if l.acceptCaseInsensitive("PREFIX") {
 			l.emit(tokenSparqlPrefix)
 			// consume and ignore any whitespace before localname
-			for r := l.next(); r == ' ' || r == '\t'; r = l.next() {
+			for _r := l.next(); _r == ' ' || r == '\t'; _r = l.next() {
 			}
 			l.backup()
 			l.ignore()

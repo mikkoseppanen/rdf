@@ -13,7 +13,10 @@ type ParseOption int
 const (
 	// Base IRI to resolve relative IRIs against (for formats that support
 	// relative IRIs: Turtle, RDF/XML, TriG, JSON-LD)
-	Base ParseOption = iota
+	OptBase ParseOption = iota
+
+	// BNodeGenerator to generate blank nodes during decoding.
+	OptBNodeGenerator
 
 	// Strict mode determines how the decoder responds to errors.
 	// When true (the default), it will fail on any malformed input. When

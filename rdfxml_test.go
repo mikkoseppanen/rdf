@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+var xmlGenOptions = &BNodeGeneratorOptions{IDFormat: "_:b%d"}
+
 func BenchmarkDecodeRDFXML(b *testing.B) {
 	input := `<?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF xml:base="http://www.gutenberg.org/"
@@ -206,6 +208,8 @@ func BenchmarkDecodeRDFXML(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		dec := NewTripleDecoder(bytes.NewBufferString(input), RDFXML)
+		dec.SetOption(OptBNodeGenerator, NewBNodeGenerator(xmlGenOptions))
+
 		for _, err := dec.Decode(); err != io.EOF; _, err = dec.Decode() {
 			if err != nil {
 				b.Fatal(err)
@@ -218,7 +222,8 @@ func BenchmarkDecodeRDFXML(b *testing.B) {
 func TestRDFXMLExamples(t *testing.T) {
 	for i, test := range rdfxmlExamples {
 		dec := NewTripleDecoder(bytes.NewBufferString(test.rdfxml), RDFXML)
-		dec.SetOption(Base, IRI{str: "http://www.w3.org/2013/RDFXMLTests/" + test.file})
+		dec.SetOption(OptBNodeGenerator, NewBNodeGenerator(xmlGenOptions))
+		dec.SetOption(OptBase, IRI{str: "http://www.w3.org/2013/RDFXMLTests/" + test.file})
 		ts, err := dec.DecodeAll()
 		if err != nil {
 			t.Fatalf("[%d] parseRDFXML(%s).Serialize(NTriples) => %v, want %q", i, test.rdfxml, err, test.nt)
@@ -241,7 +246,8 @@ func TestRDFXMLExamples(t *testing.T) {
 func TestRDFXML(t *testing.T) {
 	for i, test := range rdfxmlTestSuite {
 		dec := NewTripleDecoder(bytes.NewBufferString(test.rdfxml), RDFXML)
-		dec.SetOption(Base, IRI{str: "http://www.w3.org/2013/RDFXMLTests/" + test.file})
+		dec.SetOption(OptBNodeGenerator, NewBNodeGenerator(xmlGenOptions))
+		dec.SetOption(OptBase, IRI{str: "http://www.w3.org/2013/RDFXMLTests/" + test.file})
 		ts, err := dec.DecodeAll()
 		if test.err == "TODO" {
 			continue
@@ -684,7 +690,7 @@ _:b0 <http://example.org/named> "Dürst" .
 		"rdf-charmod-uris/test002.rdf",
 		`<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
          xmlns:eg="http://example.org/#">
- 
+
   <!-- The %C3%A9 below corresponds to é under the standard
         %-escaping algorithm for URIs. -->
 
@@ -736,7 +742,7 @@ _:b0 <http://example.org/named> "Dürst" .
 		"rdf-containers-syntax-vs-schema/test001.rdf",
 		`<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
 
-  <rdf:Bag> 
+  <rdf:Bag>
     <rdf:li>1</rdf:li>
     <rdf:li>2</rdf:li>
   </rdf:Bag>
@@ -892,11 +898,11 @@ _:b0 <http://www.w3.org/1999/02/22-rdf-syntax-ns#_2> "2" .
 		"rdf-containers-syntax-vs-schema/test008.rdf",
 		`<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
 
-  <rdf:Description rdf:about="http://desc"> 
+  <rdf:Description rdf:about="http://desc">
     <rdf:li>1</rdf:li>
   </rdf:Description>
 
-  <rdf:Description rdf:about="http://desc"> 
+  <rdf:Description rdf:about="http://desc">
     <rdf:li>1-again</rdf:li>
   </rdf:Description>
 </rdf:RDF>`,
@@ -929,13 +935,13 @@ _:b0 <http://example.org/terms#title> "Dogs in Hats" .
 		`<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
          xmlns:eg="http://example.org/">
 
- <!-- 
+ <!--
   Test case for
   Issue http://www.w3.org/2000/03/rdf-tracking/#rdf-ns-prefix-confusion
 
   List of RDF attributes that are required to have an rdf: prefix
-    about aboutEach 
-    ID bagID type resource parseType 
+    about aboutEach
+    ID bagID type resource parseType
 
   Dave Beckett - http://purl.org/net/dajobe/
 
@@ -947,7 +953,7 @@ _:b0 <http://example.org/terms#title> "Dogs in Hats" .
   <rdf:Description rdf:about="http://example.org/resource1/">
     <eg:property>bar</eg:property>
   </rdf:Description>
-   
+
 </rdf:RDF>`,
 		`<http://example.org/resource1/> <http://example.org/property> "bar" .
 `,
@@ -962,13 +968,13 @@ _:b0 <http://example.org/terms#title> "Dogs in Hats" .
 		"rdf-ns-prefix-confusion/test0003.rdf",
 		`<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
          xmlns:eg="http://example.org/">
- <!-- 
+ <!--
   Test case for
   Issue http://www.w3.org/2000/03/rdf-tracking/#rdf-ns-prefix-confusion
 
   List of RDF attributes that are required to have an rdf: prefix
-    about aboutEach 
-    ID bagID type resource parseType 
+    about aboutEach
+    ID bagID type resource parseType
 
   Dave Beckett - http://purl.org/net/dajobe/
 
@@ -980,7 +986,7 @@ _:b0 <http://example.org/terms#title> "Dogs in Hats" .
   <rdf:Description rdf:about="http://example.org/resource1/">
     <!-- 6.12 propertyElt part 4; 6.16 idRefAttr; 6.18 resourceAttr -->
     <eg:property rdf:resource="http://example.org/resource2/"/>
-   
+
  </rdf:Description>
 </rdf:RDF>`,
 		`<http://example.org/resource1/> <http://example.org/property> <http://example.org/resource2/> .
@@ -996,13 +1002,13 @@ _:b0 <http://example.org/terms#title> "Dogs in Hats" .
 		"rdf-ns-prefix-confusion/test0004.rdf",
 		`<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
          xmlns:eg="http://example.org/">
- <!-- 
+ <!--
   Test case for
   Issue http://www.w3.org/2000/03/rdf-tracking/#rdf-ns-prefix-confusion
 
   List of RDF attributes that are required to have an rdf: prefix
-    about aboutEach 
-    ID bagID type resource parseType 
+    about aboutEach
+    ID bagID type resource parseType
 
   Dave Beckett - http://purl.org/net/dajobe/
 
@@ -1014,7 +1020,7 @@ _:b0 <http://example.org/terms#title> "Dogs in Hats" .
   <rdf:Description rdf:ID="foo">
     <eg:property>bar</eg:property>
   </rdf:Description>
-  
+
 </rdf:RDF>`,
 		`<http://www.w3.org/2013/RDFXMLTests/rdf-ns-prefix-confusion/test0004.rdf#foo> <http://example.org/property> "bar" .
 `,
@@ -1029,13 +1035,13 @@ _:b0 <http://example.org/terms#title> "Dogs in Hats" .
 		"rdf-ns-prefix-confusion/test0005.rdf",
 		`<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
          xmlns:eg="http://example.org/">
- <!-- 
+ <!--
   Test case for
   Issue http://www.w3.org/2000/03/rdf-tracking/#rdf-ns-prefix-confusion
 
   List of RDF attributes that are required to have an rdf: prefix
-    about aboutEach 
-    ID bagID type resource parseType 
+    about aboutEach
+    ID bagID type resource parseType
 
   Dave Beckett - http://purl.org/net/dajobe/
 
@@ -1053,7 +1059,7 @@ _:b0 <http://example.org/terms#title> "Dogs in Hats" .
        <eg:property2>bar</eg:property2>
     </eg:property>
   </rdf:Description>
-  
+
 </rdf:RDF>`,
 		`<http://example.org/resource1/> <http://example.org/property> _:b0 .
 _:b0 <http://example.org/property2> "bar" .
@@ -1068,13 +1074,13 @@ _:b0 <http://example.org/property2> "bar" .
 		//
 		"rdf-ns-prefix-confusion/test0006.rdf",
 		`<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
- <!-- 
+ <!--
   Test case for
   Issue http://www.w3.org/2000/03/rdf-tracking/#rdf-ns-prefix-confusion
 
   List of RDF attributes that are required to have an rdf: prefix
-    about aboutEach 
-    ID bagID type resource parseType 
+    about aboutEach
+    ID bagID type resource parseType
 
   Dave Beckett - http://purl.org/net/dajobe/
 
@@ -1085,7 +1091,7 @@ _:b0 <http://example.org/property2> "bar" .
   <!-- 6.3 description, part 1; 6.10 propAttr, part 1; 6.11 typeAttr -->
   <rdf:Description rdf:about="http://example.org/resource/"
                    rdf:type="http://example.org/class/"/>
-  
+
 </rdf:RDF>`,
 		`<http://example.org/resource/> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example.org/class/> .
 `,
@@ -1101,7 +1107,7 @@ _:b0 <http://example.org/property2> "bar" .
 		`<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
          xmlns:eg="http://example.org/">
 
- <!-- 
+ <!--
   Test case for
   Issue http://www.w3.org/2000/03/rdf-tracking/#rdf-ns-prefix-confusion
 
@@ -1134,7 +1140,7 @@ _:b0 <http://example.org/property2> "bar" .
      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
      xmlns:eg="http://example.org/">
 
- <!-- 
+ <!--
   Test case for
   Issue http://www.w3.org/2000/03/rdf-tracking/#rdf-ns-prefix-confusion
 
@@ -1148,7 +1154,7 @@ _:b0 <http://example.org/property2> "bar" .
 
   <!-- Testing outer bare RDF element (using default namespace) -->
 
-  <!-- Testing bare Description element (using default namespace) 
+  <!-- Testing bare Description element (using default namespace)
        - expect 1 triple -->
 
   <!-- 6.3 description, part 1; 6.10 propAttr; 6.14 propName; 6.19 Qname -->
@@ -1172,7 +1178,7 @@ _:b0 <http://example.org/property2> "bar" .
      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
      xmlns:eg="http://example.org/">
 
- <!-- 
+ <!--
   Test case for
   Issue http://www.w3.org/2000/03/rdf-tracking/#rdf-ns-prefix-confusion
 
@@ -1189,7 +1195,7 @@ _:b0 <http://example.org/property2> "bar" .
   <!-- Testing bare Seq element (using default namespace)
        - expect 2 triples  -->
 
-  <!-- 6.2 obj; 6.4 container; 6.25 sequence, part 1; idAttr; --> 
+  <!-- 6.2 obj; 6.4 container; 6.25 sequence, part 1; idAttr; -->
   <Seq rdf:ID="container">
     <!-- 6.28 member; 6.29 inlineItem, part 1 -->
     <rdf:li>bar</rdf:li>
@@ -1213,7 +1219,7 @@ _:b0 <http://example.org/property2> "bar" .
      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
      xmlns:eg="http://example.org/">
 
- <!-- 
+ <!--
   Test case for
   Issue http://www.w3.org/2000/03/rdf-tracking/#rdf-ns-prefix-confusion
 
@@ -1230,7 +1236,7 @@ _:b0 <http://example.org/property2> "bar" .
   <!-- Testing bare Bag element (using default namespace)
        - expect 2 triples  -->
 
-  <!-- 6.2 obj; 6.4 container; 6.26 bag, part 1; idAttr; --> 
+  <!-- 6.2 obj; 6.4 container; 6.26 bag, part 1; idAttr; -->
   <Bag rdf:ID="container">
     <!-- 6.28 member; 6.29 inlineItem, part 1 -->
     <rdf:li>bar</rdf:li>
@@ -1254,7 +1260,7 @@ _:b0 <http://example.org/property2> "bar" .
      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
      xmlns:eg="http://example.org/">
 
- <!-- 
+ <!--
   Test case for
   Issue http://www.w3.org/2000/03/rdf-tracking/#rdf-ns-prefix-confusion
 
@@ -1271,7 +1277,7 @@ _:b0 <http://example.org/property2> "bar" .
   <!-- Testing bare Alt element (using default namespace)
        - expect 2 triples  -->
 
-  <!-- 6.2 obj; 6.4 container; 6.27 alternative, part 1; idAttr; --> 
+  <!-- 6.2 obj; 6.4 container; 6.27 alternative, part 1; idAttr; -->
   <Alt rdf:ID="container">
     <!-- 6.28 member; 6.29 inlineItem, part 1 -->
     <rdf:li>bar</rdf:li>
@@ -1295,7 +1301,7 @@ _:b0 <http://example.org/property2> "bar" .
      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
      xmlns:eg="http://example.org/">
 
- <!-- 
+ <!--
   Test case for
   Issue http://www.w3.org/2000/03/rdf-tracking/#rdf-ns-prefix-confusion
 
@@ -1311,10 +1317,10 @@ _:b0 <http://example.org/property2> "bar" .
 
   <!-- Testing bare Seq element (using default namespace) -->
 
-  <!-- Testing bare li element (using default namespace) 
+  <!-- Testing bare li element (using default namespace)
        - expect 2 triples -->
 
-  <!-- 6.2 obj; 6.4 container; 6.25 sequence, part 1; idAttr; --> 
+  <!-- 6.2 obj; 6.4 container; 6.25 sequence, part 1; idAttr; -->
   <Seq rdf:ID="container">
     <!-- 6.28 member; 6.29 inlineItem, part 1 -->
     <li>bar</li>
@@ -1401,11 +1407,11 @@ _:b0 <http://example.org/property2> "bar" .
 		// A statement with an rdf:ID creates a regular triple.
 		//
 		"rdfms-difference-between-ID-and-about/test1.rdf",
-		`<!--  
+		`<!--
 Base URI: http://www.w3.org/2013/RDFXMLTests/rdfms-difference-between-ID-and-about/test1.rdf
 
 A statement with an rdf:ID creates a regular triple.
---> 
+-->
 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
 <rdf:Description rdf:ID="foo">
   <rdf:value>abc</rdf:value>
@@ -1422,7 +1428,7 @@ A statement with an rdf:ID creates a regular triple.
 		// value of rdf:ID attribute.
 		//
 		"rdfms-difference-between-ID-and-about/test2.rdf",
-		`<!--  
+		`<!--
 Base URI: http://www.w3.org/2013/RDFXMLTests/rdfms-difference-between-ID-and-about/test2.rdf
 
 Non-ASCII characters in IDs are not converted.
@@ -1443,7 +1449,7 @@ Non-ASCII characters in IDs are not converted.
 		// value of rdf:about attribute.
 		//
 		"rdfms-difference-between-ID-and-about/test3.rdf",
-		`<!--  
+		`<!--
 Base URI: http://www.w3.org/2013/RDFXMLTests/rdfms-difference-between-ID-and-about/test3.rdf
 
 Non-ASCII characters in URIs are not converted.
@@ -1658,7 +1664,7 @@ http://www.w3.org/2013/RDFXMLTests/rdfms-empty-property-elements/test005.rdf
 -->
 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:random="http://random.ioctl.org/#">
- 
+
  <rdf:Description rdf:about="http://random.ioctl.org/#bar">
    <random:someProperty rdf:ID="foo" />
  </rdf:Description>
@@ -1693,7 +1699,7 @@ http://www.w3.org/2013/RDFXMLTests/rdfms-empty-property-elements/test006.rdf
 -->
 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:random="http://random.ioctl.org/#">
- 
+
  <rdf:Description rdf:about="http://random.ioctl.org/#bar">
    <random:someProperty rdf:ID="foo" rdf:parseType="Resource" />
  </rdf:Description>
@@ -1813,7 +1819,7 @@ http://www.w3.org/2013/RDFXMLTests/rdfms-empty-property-elements/test011.rdf
 -->
 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:random="http://random.ioctl.org/#">
- 
+
  <rdf:Description rdf:about="http://random.ioctl.org/#bar">
    <random:someProperty rdf:ID="foo"></random:someProperty>
  </rdf:Description>
@@ -1845,7 +1851,7 @@ http://www.w3.org/2013/RDFXMLTests/rdfms-empty-property-elements/test012.rdf
 -->
 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:random="http://random.ioctl.org/#">
- 
+
  <rdf:Description rdf:about="http://random.ioctl.org/#bar">
    <random:someProperty rdf:ID="foo" rdf:parseType="Resource"></random:someProperty>
  </rdf:Description>
@@ -1882,7 +1888,7 @@ http://lists.w3.org/Archives/Public/www-archive/2001Jun/att-0021/00-part#229
 
 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
   xmlns:random="http://random.ioctl.org/#">
- 
+
 <rdf:Description rdf:about="http://random.ioctl.org/#bar">
   <random:someProperty rdf:resource="http://random.ioctl.org/#foo"
         random:prop2="baz" />
@@ -1917,7 +1923,7 @@ http://lists.w3.org/Archives/Public/www-archive/2001Jun/att-0021/00-part#229
 
 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
   xmlns:random="http://random.ioctl.org/#">
- 
+
 <rdf:Description rdf:about="http://random.ioctl.org/#bar">
   <random:someProperty random:prop2="baz" />
 </rdf:Description>
@@ -1957,7 +1963,7 @@ http://lists.w3.org/Archives/Public/www-archive/2001Jun/att-0021/00-part#229
 
 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
   xmlns:random="http://random.ioctl.org/#">
- 
+
 <rdf:Description rdf:about="http://random.ioctl.org/#bar">
   <random:someProperty random:prop2="baz"></random:someProperty>
 </rdf:Description>
@@ -1978,7 +1984,7 @@ _:b0 <http://random.ioctl.org/#prop2> "baz" .
 		`<!--
 
  Description:
- Like test001.rdf but with a processing instruction 
+ Like test001.rdf but with a processing instruction
  as the only content of the otherwise empty element.
 
  Author: Jeremy Carroll
@@ -1988,7 +1994,7 @@ _:b0 <http://random.ioctl.org/#prop2> "baz" .
   xmlns:random="http://random.ioctl.org/#">
 
 <rdf:Description rdf:about="http://random.ioctl.org/#bar">
-  <random:someProperty rdf:resource="http://random.ioctl.org/#foo"><?a 
+  <random:someProperty rdf:resource="http://random.ioctl.org/#foo"><?a
        processing    instruction?></random:someProperty>
 </rdf:Description>
 
@@ -2007,7 +2013,7 @@ _:b0 <http://random.ioctl.org/#prop2> "baz" .
 		`<!--
 
  Description:
- Like test001.rdf but with a comment 
+ Like test001.rdf but with a comment
  as the only content of the otherwise empty element.
 
  Author: Jeremy Carroll
@@ -2022,7 +2028,7 @@ _:b0 <http://random.ioctl.org/#prop2> "baz" .
 
  Even with a comment or a processing instruction within an empty
  property element, it is still empty because an RDF Parser ignores
- the processing instruction and comment nodes when not within an 
+ the processing instruction and comment nodes when not within an
  XML Literal.
 
 --></random:someProperty>
@@ -2246,7 +2252,7 @@ _:b1 <http://example.org/prop2> "val" .
 		`<!--
 
   The value of rdf:ID must match the XML Name production,
-  (as modified by XML Namespaces). 
+  (as modified by XML Namespaces).
   $Id: error001.rdf,v 1.1 2002/07/30 09:45:51 jcarroll Exp $
 
 -->
@@ -2270,7 +2276,7 @@ _:b1 <http://example.org/prop2> "val" .
 		`<!--
 
   The value of rdf:ID must match the XML Name production,
-  (as modified by XML Namespaces). 
+  (as modified by XML Namespaces).
   $Id: error002.rdf,v 1.1 2002/07/30 09:45:51 jcarroll Exp $
 
 -->
@@ -2294,7 +2300,7 @@ _:b1 <http://example.org/prop2> "val" .
 		`<!--
 
   The value of rdf:ID must match the XML Name production,
-  (as modified by XML Namespaces). 
+  (as modified by XML Namespaces).
   $Id: error003.rdf,v 1.1 2002/07/30 09:45:51 jcarroll Exp $
 
 -->
@@ -2321,7 +2327,7 @@ _:b1 <http://example.org/prop2> "val" .
 		`<!--
 
   The value of rdf:ID must match the XML Name production,
-  (as modified by XML Namespaces). 
+  (as modified by XML Namespaces).
   $Id: error004.rdf,v 1.1 2002/07/30 09:45:51 jcarroll Exp $
 
 -->
@@ -2346,7 +2352,7 @@ _:b1 <http://example.org/prop2> "val" .
 		`<!--
 
   The value of rdf:ID must match the XML Name production,
-  (as modified by XML Namespaces). 
+  (as modified by XML Namespaces).
   $Id: error005.rdf,v 1.1 2002/07/30 09:45:51 jcarroll Exp $
 
 -->
@@ -2375,7 +2381,7 @@ _:b1 <http://example.org/prop2> "val" .
 		`<!--
 
   The value of rdf:bagID must match the XML Name production,
-  (as modified by XML Namespaces). 
+  (as modified by XML Namespaces).
   $Id: error006.rdf,v 1.1 2002/07/30 09:45:51 jcarroll Exp $
 
 -->
@@ -2399,7 +2405,7 @@ _:b1 <http://example.org/prop2> "val" .
 		`<!--
 
   The value of rdf:bagID must match the XML Name production,
-  (as modified by XML Namespaces). 
+  (as modified by XML Namespaces).
   $Id: error007.rdf,v 1.1 2002/07/30 09:45:51 jcarroll Exp $
 
 -->
@@ -3421,7 +3427,7 @@ _:b1 <http://example.org/property2> _:a .
 		`<!--
 
   The value of rdf:nodeID must match the XML Name production,
-  (as modified by XML Namespaces). 
+  (as modified by XML Namespaces).
   $Id: error001.rdf,v 1.1 2002/07/30 09:45:51 jcarroll Exp $
 
 -->
@@ -3445,7 +3451,7 @@ _:b1 <http://example.org/property2> _:a .
 		`<!--
 
   The value of rdf:nodeID must match the XML Name production,
-  (as modified by XML Namespaces). 
+  (as modified by XML Namespaces).
   $Id: error002.rdf,v 1.1 2002/07/30 09:45:51 jcarroll Exp $
 
 -->

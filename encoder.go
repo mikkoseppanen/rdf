@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"sort"
+
+	"repoman.ebi/shcp/platform/seas/Common/Go/SeasObjects/common/property"
 )
 
 // ErrEncoderClosed is the error returned from Encode() when the Triple/Quad-Encoder is closed
@@ -23,6 +25,8 @@ type TripleEncoder struct {
 	format        Format            // Serialization format.
 	w             *errWriter        // Buffered writer. Set to nil when Encoder is closed.
 	ns            map[string]string // IRI->prefix mappings.
+	nsPreset      map[string]string // Preset map of namespace IRI->prefix mappings.
+	nsPresetDone  bool              // True if namespace preset has been written to output
 	nsCount       int               // Counter to generate unique namespace prefixes
 	curSubj       Subject           // Keep track of current subject, to enable encoding of predicate lists.
 	curPred       Predicate         // Keep track of current subject, to enable encoding of object list.
@@ -33,10 +37,48 @@ type TripleEncoder struct {
 // given io.Writer in the given serialization format.
 func NewTripleEncoder(w io.Writer, f Format) *TripleEncoder {
 	return &TripleEncoder{
-		format: f,
-		w:      &errWriter{w: bufio.NewWriter(w)},
-		ns:     make(map[string]string),
+		format:   f,
+		w:        &errWriter{w: bufio.NewWriter(w)},
+		ns:       make(map[string]string),
+		nsPreset: make(map[string]string),
 	}
+}
+
+// NewTripleEncoder returns a new TripleEncoder capable of serializing into the
+// given io.Writer in the given serialization format. Accepts an map of IRI to
+// prefix mappings that will be sent out as default namespaces
+func NewTripleEncoderNS(w io.Writer, f Format, ns map[string]string) *TripleEncoder {
+	t := NewTripleEncoder(w, f)
+	t.SetNS(ns)
+	return t
+}
+
+// Reset reset the encoder state, essentially allowing to start a fresh document
+// without initializing a new TripleEncoder struct.
+func (e *TripleEncoder) Reset() {
+	e.w.err = nil
+	e.ns = make(map[string]string)
+	e.nsPreset = nil
+	e.nsPresetDone = false
+	e.nsCount = 0
+	e.curPred = nil
+	e.curSubj = nil
+	e.OpenStatement = false
+}
+
+// SetNS can be used to set namespace preset map.
+// Has no effect on output if initial namespaces are already sent.
+func (e *TripleEncoder) SetNS(ns map[string]string) {
+	if ns == nil {
+		e.nsPreset = make(map[string]string)
+	} else {
+		e.nsPreset = ns
+	}
+}
+
+// NSPreset returns the current map of preset namespaces
+func (e *TripleEncoder) NS() map[string]string {
+	return e.nsPreset
 }
 
 // Encode serializes a single Triple to the io.Writer of the TripleEncoder.
@@ -44,6 +86,7 @@ func (e *TripleEncoder) Encode(t Triple) error {
 	if e.w == nil {
 		return ErrEncoderClosed
 	}
+
 	switch e.format {
 	case NTriples:
 		_, err := e.w.w.Write([]byte(t.Serialize(e.format)))
@@ -53,8 +96,11 @@ func (e *TripleEncoder) Encode(t Triple) error {
 	case Turtle:
 		var s, p, o string
 
+		// forward output new prefixes
+		e.outputNewPrefixes([]Triple{t})
+
 		// object is allways rendered the same
-		o = e.prefixify(t.Obj)
+		o = e.serializeTerm(t.Obj)
 
 		if e.OpenStatement {
 			// potentially predicate/object list
@@ -67,7 +113,7 @@ func (e *TripleEncoder) Encode(t Triple) error {
 					p = ""
 				} else {
 					// in predicate list
-					p = e.prefixify(t.Pred)
+					p = e.serializeTerm(t.Pred)
 
 					// check if predicate introduced new prefix directive
 					if e.OpenStatement {
@@ -77,7 +123,7 @@ func (e *TripleEncoder) Encode(t Triple) error {
 					} else {
 						// previous statement closed
 						e.curSubj = t.Subj
-						s = e.prefixify(t.Subj)
+						s = e.serializeTerm(t.Subj)
 						e.curPred = t.Pred
 					}
 				}
@@ -86,15 +132,15 @@ func (e *TripleEncoder) Encode(t Triple) error {
 				// close previous statement
 				e.w.write([]byte(" .\n"))
 				e.OpenStatement = false
-				p = e.prefixify(t.Pred)
+				p = e.serializeTerm(t.Pred)
 				e.curSubj = t.Subj
-				s = e.prefixify(t.Subj)
+				s = e.serializeTerm(t.Subj)
 				e.curPred = t.Pred
 			}
 		} else {
 			// either first statement, or after a prefix directive
-			p = e.prefixify(t.Pred)
-			s = e.prefixify(t.Subj)
+			p = e.serializeTerm(t.Pred)
+			s = e.serializeTerm(t.Subj)
 			e.curSubj = t.Subj
 			e.curPred = t.Pred
 		}
@@ -115,6 +161,21 @@ func (e *TripleEncoder) Encode(t Triple) error {
 		panic("TODO")
 	}
 	return nil
+}
+
+// EncodeAllNS allows to add a preset map of namespaces for the output document.
+// New Namespaces are generated normally for any namespaces that are not found
+// in given map.
+// Namespace map should contain prefix as key and the corresponding IRI as value.
+func (e *TripleEncoder) EncodeAllNS(ts []Triple, ns map[string]string) error {
+	for prefix, uri := range ns {
+		e.ns[uri] = prefix
+	}
+
+	switch e.format {
+
+	}
+	return e.EncodeAll(ts)
 }
 
 // EncodeAll serializes a slice of Triples to the io.Writer of the TripleEncoder.
@@ -139,9 +200,12 @@ func (e *TripleEncoder) EncodeAll(ts []Triple) error {
 
 		var s, p, o string
 
+		// forward output new prefixes
+		e.outputNewPrefixes(ts)
+
 		for i, t := range ts {
 			// object is allways rendered the same
-			o = e.prefixify(t.Obj)
+			o = e.serializeTerm(t.Obj)
 
 			if e.OpenStatement {
 				// potentially predicate/object list
@@ -160,7 +224,7 @@ func (e *TripleEncoder) EncodeAll(ts []Triple) error {
 						p = ""
 					} else {
 						// in predicate list
-						p = e.prefixify(t.Pred)
+						p = e.serializeTerm(t.Pred)
 
 						// check if predicate introduced new prefix directive
 						if e.OpenStatement {
@@ -170,7 +234,7 @@ func (e *TripleEncoder) EncodeAll(ts []Triple) error {
 						} else {
 							// previous statement closed
 							e.curSubj = t.Subj
-							s = e.prefixify(t.Subj)
+							s = e.serializeTerm(t.Subj)
 							e.curPred = t.Pred
 						}
 					}
@@ -179,15 +243,15 @@ func (e *TripleEncoder) EncodeAll(ts []Triple) error {
 					// close previous statement
 					e.w.write([]byte(" .\n"))
 					e.OpenStatement = false
-					p = e.prefixify(t.Pred)
+					p = e.serializeTerm(t.Pred)
 					e.curSubj = t.Subj
-					s = e.prefixify(t.Subj)
+					s = e.serializeTerm(t.Subj)
 					e.curPred = t.Pred
 				}
 			} else {
 				// either first statement, or after a prefix directive
-				p = e.prefixify(t.Pred)
-				s = e.prefixify(t.Subj)
+				p = e.serializeTerm(t.Pred)
+				s = e.serializeTerm(t.Subj)
 				e.curSubj = t.Subj
 				e.curPred = t.Pred
 			}
@@ -228,59 +292,107 @@ func (e *TripleEncoder) Close() error {
 	return err
 }
 
-func (e *TripleEncoder) prefixify(t Term) string {
-	if t.Type() == TermIRI {
-		if t.(IRI).str == "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" {
-			return "a"
-		}
-		first, rest := t.(IRI).Split()
+func (e *TripleEncoder) serializeTerm(t Term) string {
+	switch t.Type() {
+	case TermIRI:
+		return e.serializeIRI(t.(IRI))
+
+	case TermLiteral:
+		return e.serializeLiteral(t.(Literal))
+
+	default:
+		return t.Serialize(Turtle)
+	}
+}
+
+func (e *TripleEncoder) serializeIRI(t IRI) string {
+	if t.String() == property.Type {
+		return "a"
+	}
+
+	first, rest := t.Split()
+	if first == "" {
+		return t.Serialize(Turtle)
+	}
+
+	rest = escapeLocal(rest)
+	prefix := e.prefixify(first)
+
+	return fmt.Sprintf("%s:%s", prefix, rest)
+}
+
+func (e *TripleEncoder) serializeLiteral(t Literal) string {
+	switch t.DataType {
+	case xsdString, xsdInteger, xsdBoolean, xsdDouble, xsdDecimal, rdfLangString:
+		return t.Serialize(Turtle)
+
+	default:
+		first, rest := t.DataType.Split()
 		if first == "" {
-			// cannot split into prefix and namespace
 			return t.Serialize(Turtle)
 		}
 
 		rest = escapeLocal(rest)
+		prefix := e.prefixify(first)
 
-		prefix, ok := e.ns[first]
-		if !ok {
-			prefix = fmt.Sprintf("ns%d", e.nsCount)
-			e.ns[first] = prefix
-			if e.OpenStatement {
-				e.w.write([]byte(" .\n"))
-			}
-			e.w.write([]byte(fmt.Sprintf("@prefix %s:\t<%s> .\n", prefix, first)))
-			e.nsCount++
-			e.OpenStatement = false
-		}
-		return fmt.Sprintf("%s:%s", prefix, rest)
+		return fmt.Sprintf("\"%s\"^^%s:%s", t.String(), prefix, rest)
 	}
-	if t.Type() == TermLiteral {
+}
+
+func (e *TripleEncoder) prefixify(ns string) string {
+	prefix, ok := e.ns[ns]
+	if !ok { // Not generated yet.
+		if preset, ok := e.nsPreset[ns]; ok { // If in preset map, use that..
+			prefix = preset
+		} else { // Otherwise generate new.
+			prefix = fmt.Sprintf("ns%d", e.nsCount)
+			e.nsCount++
+		}
+
+		// output new prefix. Will also add to ns record
+		e.outputPrefix(prefix, ns)
+	}
+
+	return prefix
+}
+
+func (e *TripleEncoder) outputPrefix(prefix, ns string) {
+	e.ns[ns] = prefix
+	e.w.write([]byte(fmt.Sprintf("@prefix %s:\t<%s> .\n", prefix, ns)))
+}
+
+func (e *TripleEncoder) outputNewPrefixes(ts []Triple) {
+	for i := range ts {
+		e.outputNewPrefixesTerm(ts[i].Obj)
+		e.outputNewPrefixesTerm(ts[i].Pred)
+		e.outputNewPrefixesTerm(ts[i].Subj)
+	}
+}
+
+func (e *TripleEncoder) outputNewPrefixesTerm(t Term) {
+	switch t.Type() {
+	case TermIRI:
+		if t.(IRI).String() == property.Type {
+			return
+		}
+
+		if f, _ := t.(IRI).Split(); f != "" {
+			e.prefixify(f)
+		}
+
+	case TermLiteral:
 		switch t.(Literal).DataType {
 		case xsdString, xsdInteger, xsdBoolean, xsdDouble, xsdDecimal, rdfLangString:
-			// serialize normally in Literal.Serialize method
-			break
+			return
 		default:
-			first, rest := t.(Literal).DataType.Split()
-			if first == "" {
-				return t.Serialize(Turtle)
+			if f, _ := t.(Literal).DataType.Split(); f != "" {
+				e.prefixify(f)
 			}
-			rest = escapeLocal(rest)
-
-			prefix, ok := e.ns[first]
-			if !ok {
-				prefix = fmt.Sprintf("ns%d", e.nsCount)
-				e.ns[first] = prefix
-				if e.OpenStatement {
-					e.w.write([]byte(" .\n"))
-				}
-				e.w.write([]byte(fmt.Sprintf("@prefix %s:\t<%s> .\n", prefix, first)))
-				e.nsCount++
-				e.OpenStatement = false
-			}
-			return fmt.Sprintf("\"%s\"^^%s:%s", t.Serialize(formatInternal), prefix, rest)
 		}
+
+	default:
+		return
 	}
-	return t.Serialize(Turtle)
 }
 
 func escapeLocal(rest string) string {
@@ -344,16 +456,3 @@ func (ew *errWriter) write(buf []byte) {
 	}
 	_, ew.err = ew.w.Write(buf)
 }
-
-/*
-func (e *QuadEncoder) Encode(q Quad) err {
-	return nil
-}
-func (e *QuadEncoder) EncodeAll(qs []Quad) err {
-	return nil
-}
-
-func (e *QuadEncoder) Close() err {
-	return nil
-}
-*/

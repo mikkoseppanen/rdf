@@ -251,9 +251,9 @@ ericFoaf:ericP :givenName "Eric" ;
 var ttlBenchOutputs = []string{
 	`@prefix ns0:	<http://example.org/#> .
 @prefix ns1:	<http://www.perceive.net/schemas/relationship/> .
-ns0:green\-goblin	ns1:enemyOf	ns0:spiderman .
 @prefix ns2:	<http://xmlns.com/foaf/0.1/> .
-ns0:green\-goblin	a	ns2:Person ;
+ns0:green\-goblin	ns1:enemyOf	ns0:spiderman ;
+	a	ns2:Person ;
 	ns2:name	"Green Goblin" .
 ns0:spiderman	ns1:enemyOf	ns0:green\-goblin ;
 	a	ns2:Person ;
@@ -266,15 +266,15 @@ ns0:spiderman	ns1:enemyOf	ns0:green\-goblin .`,
 
 	`@prefix ns0:	<http://example.org/#> .
 @prefix ns1:	<http://www.perceive.net/schemas/relationship/> .
-ns0:spiderman	ns1:enemyOf	ns0:green\-goblin .
 @prefix ns2:	<http://xmlns.com/foaf/0.1/> .
-ns0:spiderman	ns2:name	"Spiderman" .`,
+ns0:spiderman	ns1:enemyOf	ns0:green\-goblin ;
+	ns2:name	"Spiderman" .`,
 
 	`@prefix ns0:	<http://example.org/#> .
 @prefix ns1:	<http://www.perceive.net/schemas/relationship/> .
-ns0:spiderman	ns1:enemyOf	ns0:green\-goblin .
 @prefix ns2:	<http://xmlns.com/foaf/0.1/> .
-ns0:spiderman	ns2:name	"Spiderman" .`,
+ns0:spiderman	ns1:enemyOf	ns0:green\-goblin ;
+	ns2:name	"Spiderman" .`,
 
 	`@prefix ns0:	<http://xmlns.com/foaf/0.1/> .
 @prefix ns1:	<http://example.org/#> .
@@ -295,16 +295,16 @@ ns0:green\-goblin	ns1:enemyOf	ns0:spiderman .`,
 ns0:green\-goblin	ns1:enemyOf	ns0:spiderman .`,
 
 	`@prefix ns0:	<http://another.example/> .
+@prefix ns1:	<http://one.example/path/> .
+@prefix ns2:	<http://one.example/> .
+@prefix ns3:	<http://two.example/> .
+@prefix ns4:	<http://伝言.example/> .
 ns0:subject5	ns0:predicate5	ns0:object5 .
 ns0:subject6	a	ns0:subject7 .
-@prefix ns1:	<http://one.example/path/> .
 ns1:subject4	ns1:predicate4	ns1:object4 .
-@prefix ns2:	<http://one.example/> .
 ns2:subject1	ns2:predicate1	ns2:object1 .
 ns2:subject2	ns2:predicate2	ns2:object2 .
-@prefix ns3:	<http://two.example/> .
 ns3:subject3	ns3:predicate3	ns3:object3 .
-@prefix ns4:	<http://伝言.example/> .
 ns4:\?user\=أكرم\&amp\;channel\=R\%26D	a	ns0:subject8 .`,
 
 	`@prefix ns0:	<http://xmlns.com/foaf/0.1/> .
@@ -313,12 +313,12 @@ ns1:green\-goblin	ns0:name	"Green Goblin" .
 ns1:spiderman	ns0:name	"Spiderman" .`,
 
 	`@prefix ns0:	<http://example.org/vocab/show/> .
+@prefix ns1:	<http://www.w3.org/2000/01/rdf-schema#> .
 ns0:218	ns0:blurb	"This is a multi-line\nliteral with many quotes (\"\"\"\"\")\nand up to two sequential apostrophes ('')." ;
 	ns0:localName	"That Seventies Show"@en ,
 			"Cette Série des Années Soixante-dix"@fr ,
-			"Cette Série des Années Septante"@fr-be .
-@prefix ns1:	<http://www.w3.org/2000/01/rdf-schema#> .
-ns0:218	ns1:label	"That Seventies Show" .`,
+			"Cette Série des Années Septante"@fr-be ;
+	ns1:label	"That Seventies Show" .`,
 
 	`@prefix ns0:	<http://example.org/> .
 @prefix ns1:	<http://en.wikipedia.org/wiki/> .
@@ -367,24 +367,24 @@ _:b3	ns0:first	ns1:fooc ;
 
 	`@prefix ns0:	<http://example.org/stuff/1.0/> .
 @prefix ns1:	<http://www.w3.org/TR/> .
-ns1:rdf\-syntax\-grammar	ns0:editor	_:b1 .
 @prefix ns2:	<http://purl.org/dc/elements/1.1/> .
-ns1:rdf\-syntax\-grammar	ns2:title	"RDF/XML Syntax Specification (Revised)" .
-_:b1	ns0:fullname	"Dave Beckett" .
 @prefix ns3:	<http://purl.org/net/dajobe/> .
-_:b1	ns0:homePage	ns3: .`,
+ns1:rdf\-syntax\-grammar	ns0:editor	_:b1 ;
+	ns2:title	"RDF/XML Syntax Specification (Revised)" .
+_:b1	ns0:fullname	"Dave Beckett" ;
+	ns0:homePage	ns3: .`,
 
 	`@prefix ns0:	<http://example.org/stuff/1.0/> .
-ns0:a	ns0:b	_:b1 .
 @prefix ns1:	<http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+ns0:a	ns0:b	_:b1 .
 _:b1	ns1:first	"apple" ;
 	ns1:rest	_:b2 .
 _:b2	ns1:first	"banana" ;
 	ns1:rest	ns1:nil .`,
 
 	`@prefix ns0:	<http://example.org/stuff/1.0/> .
-ns0:a	ns0:b	_:b1 .
 @prefix ns1:	<http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+ns0:a	ns0:b	_:b1 .
 _:b1	ns1:first	"apple" ;
 	ns1:rest	_:b2 .
 _:b2	ns1:first	"banana" ;
@@ -394,9 +394,9 @@ _:b2	ns1:first	"banana" ;
 ns0:a	ns0:b	"The first line\nThe second line\n  more" .`,
 
 	`@prefix ns0:	<http://example.org/stuff/1.0/> .
-_:b1	ns0:p	"w" .
 @prefix ns1:	<http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-_:b1	ns1:first	1 ;
+_:b1	ns0:p	"w" ;
+	ns1:first	1 ;
 	ns1:rest	_:b2 .
 _:b2	ns1:first	2.0 ;
 	ns1:rest	_:b3 .
@@ -404,9 +404,9 @@ _:b3	ns1:first	3E1 ;
 	ns1:rest	ns1:nil .`,
 
 	`@prefix ns0:	<http://example.org/stuff/1.0/> .
-_:b0	ns0:p	"w" .
 @prefix ns1:	<http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-_:b0	ns1:first	1 ;
+_:b0	ns0:p	"w" ;
+	ns1:first	1 ;
 	ns1:rest	_:b1 .
 _:b1	ns1:first	2.0 ;
 	ns1:rest	_:b2 .
@@ -414,9 +414,9 @@ _:b2	ns1:first	3E1 ;
 	ns1:rest	ns1:nil .`,
 
 	`@prefix ns0:	<http://example.org/stuff/1.0/> .
-_:b1	ns0:p2	ns0:q2 .
 @prefix ns1:	<http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-_:b1	ns1:first	1 ;
+_:b1	ns0:p2	ns0:q2 ;
+	ns1:first	1 ;
 	ns1:rest	_:b2 .
 _:b2	ns1:first	_:b3 ;
 	ns1:rest	_:b4 .
@@ -427,11 +427,11 @@ _:b5	ns1:first	2 ;
 	ns1:rest	ns1:nil .`,
 
 	`@prefix ns0:	<http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix ns1:	<http://example.org/stuff/1.0/> .
 _:b0	ns0:first	1 ;
 	ns0:rest	_:b1 .
 _:b1	ns0:first	_:b2 ;
 	ns0:rest	_:b3 .
-@prefix ns1:	<http://example.org/stuff/1.0/> .
 _:b2	ns1:p	ns1:q .
 _:b3	ns0:first	_:b4 ;
 	ns0:rest	ns0:nil .
@@ -440,33 +440,35 @@ _:b4	ns0:first	2 ;
 
 	`@prefix ns0:	<http://xmlns.com/foaf/0.1/> .
 @prefix ns1:	<http://www.w3.org/People/Eric/ericP-foaf.rdf#> .
-ns1:ericP	ns0:givenName	"Eric" .
 @prefix ns2:	<http://norman.walsh.name/knows/who/> .
-ns1:ericP	ns0:knows	ns2:dan\-brickley ,
-			_:b1 .
 @prefix ns3:	<http://getopenid.com/> .
-ns1:ericP	ns0:knows	ns3:amyvdh .
+ns1:ericP	ns0:givenName	"Eric" ;
+	ns0:knows	ns2:dan\-brickley ,
+			_:b1 ,
+			ns3:amyvdh .
 _:b1	ns0:mbox	<mailto:timbl@w3.org> .`,
 
 	`@prefix ns0:	<http://books.example.com/product-types/> .
 @prefix ns1:	<http://purl.org/dc/terms/> .
 @prefix ns2:	<http://books.example.com/products/> .
-ns2:9780596007683\.BOOK	ns1:type	ns0:BOOK .
 @prefix ns3:	<http://purl.org/vocab/frbr/core#> .
-ns2:9780596007683\.BOOK	a	ns3:Expression .
+@prefix ns4:	<http://books.example.com/works/> .
+ns2:9780596007683\.BOOK	ns1:type	ns0:BOOK ;
+	a	ns3:Expression .
 ns2:9780596802189\.EBOOK	ns1:type	ns0:EBOOK ;
 	a	ns3:Expression .
-@prefix ns4:	<http://books.example.com/works/> .
 ns4:45U8QJGZSQKDH8N	ns1:creator	"Wil Wheaton"@en ;
 	ns1:title	"Just a Geek"@en ;
-	ns3:realization	ns2:9780596802189\.EBOOK ,
-			ns2:9780596007683\.BOOK ;
+	ns3:realization	ns2:9780596007683\.BOOK ,
+			ns2:9780596802189\.EBOOK ;
 	a	ns3:Work .`,
 
 	`@prefix ns0:	<http://purl.org/vocab/frbr/core#> .
 @prefix ns1:	<http://books.example.com/works/> .
 ns1:45U8QJGZSQKDH8N	a	ns0:Work .`,
 }
+
+var ttlGenOptions = &BNodeGeneratorOptions{IDFormat: "_:b%d", BaseID: 1}
 
 func BenchmarkDecodeTTL(b *testing.B) {
 	var bf bytes.Buffer
@@ -476,6 +478,8 @@ func BenchmarkDecodeTTL(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		dec := NewTripleDecoder(bytes.NewReader(bf.Bytes()), Turtle)
+		dec.SetOption(OptBNodeGenerator, NewBNodeGenerator(ttlGenOptions))
+
 		for _, err := dec.Decode(); err != io.EOF; _, err = dec.Decode() {
 			if err != nil {
 				b.Fatal(err)
@@ -488,6 +492,8 @@ func BenchmarkDecodeTTL(b *testing.B) {
 func TestEncodingTTL(t *testing.T) {
 	for i, ex := range ttlBenchInputs {
 		dec := NewTripleDecoder(bytes.NewBufferString(ex), Turtle)
+		dec.SetOption(OptBNodeGenerator, NewBNodeGenerator(ttlGenOptions))
+
 		triples, err := dec.DecodeAll()
 		if err != nil {
 			t.Fatal(err)
@@ -510,6 +516,8 @@ func TestEncodingTTL(t *testing.T) {
 func TestTTL(t *testing.T) {
 	for _, test := range ttlTestSuite {
 		dec := NewTripleDecoder(bytes.NewBufferString(test.input), Turtle)
+		dec.SetOption(OptBNodeGenerator, NewBNodeGenerator(ttlGenOptions))
+
 		triples, err := dec.DecodeAll()
 		if err != nil {
 			if test.errWant == "" {
@@ -3339,7 +3347,7 @@ _:a  :p :o .`, "", []Triple{
 
 	{`@prefix : <http://www.w3.org/2013/TurtleTests/> .
 :s :p1 :o1 ;;
-   :p2 :o2 
+   :p2 :o2
    .`, "", []Triple{
 		Triple{
 			Subj: IRI{str: "http://www.w3.org/2013/TurtleTests/s"},
@@ -4379,9 +4387,9 @@ def`, "bad literal: no closing quote: '\"'", []Triple{}},
 	//   mf:result    <turtle-eval-struct-02.nt> ;
 	//   .
 
-	{`<http://www.w3.org/2013/TurtleTests/s> 
+	{`<http://www.w3.org/2013/TurtleTests/s>
       <http://www.w3.org/2013/TurtleTests/p1> <http://www.w3.org/2013/TurtleTests/o1> ;
-      <http://www.w3.org/2013/TurtleTests/p2> <http://www.w3.org/2013/TurtleTests/o2> ; 
+      <http://www.w3.org/2013/TurtleTests/p2> <http://www.w3.org/2013/TurtleTests/o2> ;
       .`, "", []Triple{
 		Triple{
 			Subj: IRI{str: "http://www.w3.org/2013/TurtleTests/s"},
@@ -4857,7 +4865,7 @@ newlines""" .`, "", []Triple{
 ## :a :b """\nthis \ris a \U00015678long\t
 ## literal\uABCD
 ## """ .
-## 
+##
 ## :d :e """\tThis \uABCDis\r \U00015678another\n
 ## one
 ## """ .
