@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"sort"
-
-	"repoman.ebi/shcp/platform/seas/Common/Go/SeasObjects/common/property"
 )
 
 // ErrEncoderClosed is the error returned from Encode() when the Triple/Quad-Encoder is closed
@@ -289,7 +287,7 @@ func (e *TripleEncoder) serializeTerm(t Term) string {
 }
 
 func (e *TripleEncoder) serializeIRI(t IRI) string {
-	if t.String() == property.Type {
+	if t.String() == "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" {
 		return "a"
 	}
 
@@ -355,7 +353,7 @@ func (e *TripleEncoder) outputNewPrefixes(ts []Triple) {
 func (e *TripleEncoder) outputNewPrefixesTerm(t Term) {
 	switch t.Type() {
 	case TermIRI:
-		if t.(IRI).String() == property.Type {
+		if t.(IRI).str == "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" {
 			return
 		}
 
