@@ -26,7 +26,6 @@ type TripleEncoder struct {
 	w             *errWriter        // Buffered writer. Set to nil when Encoder is closed.
 	ns            map[string]string // IRI->prefix mappings.
 	nsPreset      map[string]string // Preset map of namespace IRI->prefix mappings.
-	nsPresetDone  bool              // True if namespace preset has been written to output
 	nsCount       int               // Counter to generate unique namespace prefixes
 	curSubj       Subject           // Keep track of current subject, to enable encoding of predicate lists.
 	curPred       Predicate         // Keep track of current subject, to enable encoding of object list.
@@ -59,7 +58,6 @@ func (e *TripleEncoder) Reset() {
 	e.w.err = nil
 	e.ns = make(map[string]string)
 	e.nsPreset = nil
-	e.nsPresetDone = false
 	e.nsCount = 0
 	e.curPred = nil
 	e.curSubj = nil
@@ -161,21 +159,6 @@ func (e *TripleEncoder) Encode(t Triple) error {
 		panic("TODO")
 	}
 	return nil
-}
-
-// EncodeAllNS allows to add a preset map of namespaces for the output document.
-// New Namespaces are generated normally for any namespaces that are not found
-// in given map.
-// Namespace map should contain prefix as key and the corresponding IRI as value.
-func (e *TripleEncoder) EncodeAllNS(ts []Triple, ns map[string]string) error {
-	for prefix, uri := range ns {
-		e.ns[uri] = prefix
-	}
-
-	switch e.format {
-
-	}
-	return e.EncodeAll(ts)
 }
 
 // EncodeAll serializes a slice of Triples to the io.Writer of the TripleEncoder.
